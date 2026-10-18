@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>hwp-cowork 미리보기</title>
+<!-- MCP Apps 화면 (ui://hwp/viewer.html). 채팅 안에서 Claude 가 고치는 문서를 바로 보여 준다.
+     호스트와는 postMessage JSON-RPC 로만 말한다 (ext-apps SDK 없이 — CSP 가 외부 스크립트를 막는다).
+     쪽 그림은 앱 전용 도구 hwp_app_page 로 받아 data: 로 그린다 (img-src 에 서버 도메인을 열 필요가 없다). -->
+<style>
+:root{--bg:#ffffff;--fg:#1f2328;--mut:#6b7280;--line:#dfe3ea;--soft:#f3f6fb;--acc:#2E62B8;--acc2:#4f7fd6;--acc-soft:#e8effb;
+  --ok:#15803d;--ok-soft:#e7f6ec;--busy:#c2410c;--busy-soft:#fdeee4;--bad:#c62828;--paper:#fff;--shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.08)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#262624;--fg:#ececec;--mut:#a1a1aa;--line:#3f3f46;--soft:#2f2f2d;--acc:#8fb0f0;--acc2:#6d93e0;--acc-soft:#2b3446;--ok:#4ade80;--ok-soft:#1f3326;--busy:#fb923c;--busy-soft:#3a2a1f;--bad:#f87171;--shadow:none}}
+:root[data-theme="dark"]{--bg:#262624;--fg:#ececec;--mut:#a1a1aa;--line:#3f3f46;--soft:#2f2f2d;--acc:#8fb0f0;--acc2:#6d93e0;--acc-soft:#2b3446;--ok:#4ade80;--ok-soft:#1f3326;--busy:#fb923c;--busy-soft:#3a2a1f;--bad:#f87171;--shadow:none}
+/* 호스트가 iframe 바탕을 칠하는 색과 테마가 어긋나도 글자가 묻히지 않게 바탕을 직접 칠한다 */
+html,body{margin:0;background:var(--bg);color:var(--fg);font:13px/1.45 -apple-system,system-ui,"Apple SD Gothic Neo","Malgun Gothic",sans-serif}
+#app{padding:10px 12px 12px}
+/* 머리 줄 */
+.bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;padding:8px 10px;border-radius:10px;
+  background:linear-gradient(135deg,var(--acc-soft),var(--soft));border:1px solid var(--line)}
+.ic{width:28px;height:28px;border-radius:7px;flex:none;display:grid;place-items:center;color:#fff;
+  background:linear-gradient(135deg,var(--acc2),var(--acc));box-shadow:var(--shadow)}
+.ic svg{width:16px;height:16px}
+.name{font-weight:650;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1 1 140px}
+.chip{font-size:12px;font-weight:600;padding:2px 9px;border-radius:999px;white-space:nowrap;background:var(--ok-soft);color:var(--ok)}
+.chip.busy{background:var(--busy-soft);color:var(--busy)}
+.chip.busy::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:currentColor;margin-right:6px;vertical-align:1px;animation:blink 1s infinite}
+.chip.mute{background:var(--soft);color:var(--mut)}
+@keyframes blink{50%{opacity:.25}}
+.pager{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:8px;background:var(--bg);overflow:hidden}
+.pager button{border:0;border-radius:0;padding:4px 10px;background:transparent}
+.pager span{font-size:12px;font-variant-numeric:tabular-nums;color:var(--mut);padding:0 6px;min-width:40px;text-align:center}
+/* 버튼: 누르면 눌린 느낌(살짝 작아지고 진해짐) + 물결 */
+button{position:relative;overflow:hidden;font:inherit;font-size:12.5px;font-weight:600;padding:5px 11px;border-radius:8px;border:1px solid var(--line);
+  background:var(--bg);color:var(--fg);cursor:pointer;transition:transform .08s,background .15s,box-shadow .15s,border-color .15s;-webkit-tap-highlight-color:transparent}
+button:hover:not(:disabled){background:var(--acc-soft);border-color:var(--acc)}
+button:active:not(:disabled){transform:scale(.94);box-shadow:inset 0 2px 4px rgba(0,0,0,.18)}
+button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+button:disabled{opacity:.35;cursor:default}
+button.primary{background:linear-gradient(135deg,var(--acc2),var(--acc));border-color:transparent;color:#fff;box-shadow:var(--shadow)}
+button.primary:hover:not(:disabled){filter:brightness(1.08);background:linear-gradient(135deg,var(--acc2),var(--acc))}
+button.wait{pointer-events:none;color:transparent}
+button.wait::after{content:"";position:absolute;inset:0;margin:auto;width:12px;height:12px;border-radius:50%;border:2px solid currentColor;
+  border-color:var(--acc) transparent var(--acc) transparent;animation:spin .7s linear infinite}
+button.primary.wait::after{border-color:#fff transparent #fff transparent}
+:root[data-theme="dark"] button.primary{color:#0f1b33}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) button.primary{color:#0f1b33}}
+.ripple{position:absolute;border-radius:50%;transform:scale(0);background:currentColor;opacity:.25;animation:rip .45s ease-out;pointer-events:none}
+@keyframes rip{to{transform:scale(3.2);opacity:0}}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* 쪽 */
+.page{background:var(--paper);border:1px solid var(--line);border-radius:10px;overflow:hidden;min-height:160px;display:flex;align-items:center;justify-content:center;
+  transition:opacity .15s;box-shadow:var(--shadow);position:relative}
+.page.loading{opacity:.6}
+.page.loading::after{content:"";position:absolute;left:0;top:0;height:3px;width:40%;background:var(--acc);animation:slide 1s ease-in-out infinite}
+.page img{display:block;width:100%;height:auto}
+.msg{color:var(--mut);padding:22px 12px;text-align:center}
+.err{color:var(--bad)}
+/* 올리기 */
+.drop{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:150px;padding:20px 14px;border-radius:14px;
+  border:2px dashed var(--line);background:var(--soft);color:var(--mut);text-align:center;cursor:pointer;
+  transition:background .15s,border-color .15s,transform .15s,box-shadow .15s}
+.drop:hover{border-color:var(--acc)}
+.drop .cloud{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;color:var(--acc);background:var(--acc-soft);transition:transform .2s}
+.drop .cloud svg{width:24px;height:24px}
+.drop .t1{font-size:14px;font-weight:650;color:var(--fg)}
+.drop .t2{font-size:12px}
+.drop.on{border-style:solid;border-color:var(--acc);background:var(--acc-soft);transform:scale(1.015);box-shadow:0 0 0 4px var(--acc-soft)}
+.drop.on .cloud{transform:translateY(-4px) scale(1.1)}
+.drop.ask{border-color:var(--acc);animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 6px var(--acc-soft)}}
+.drop input{display:none}
+.prog{width:100%;max-width:360px;height:8px;border-radius:999px;background:var(--line);overflow:hidden;position:relative}
+.prog i{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:999px;background:linear-gradient(90deg,var(--acc2),var(--acc));transition:width .2s}
+.prog.ind i{width:35%;animation:slide 1.2s ease-in-out infinite}
+@keyframes slide{0%{left:-35%}100%{left:100%}}
+.ptext{font-size:12px;color:var(--mut);font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<div id="app"><div class="msg">불러오는 중…</div></div>
+<script>
+(() => {
+  "use strict";
+  const app = document.getElementById("app");
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  // ---- JSON-RPC (호스트 = window.parent) ----
+  let nextId = 1;
+  const pending = new Map();
+  const post = (m) => window.parent.postMessage({ jsonrpc: "2.0", ...m }, "*");
+  const notify = (method, params) => post({ method, params: params || {} });
+  const request = (method, params) => new Promise((res, rej) => {
+    const id = nextId++;
+    pending.set(id, { res, rej });
+    post({ id, method, params: params || {} });
+    setTimeout(() => { if (pending.delete(id)) rej(new Error("응답이 없다")); }, 90000);
+  });
+  const text = (r) => ((r && r.content) || []).filter((c) => c.type === "text").map((c) => c.text).join("\n");
+  async function call(name, args) {
+    const r = await request("tools/call", { name, arguments: args });
+    if (r && r.isError) throw new Error(text(r) || "오류");
+    return r;
+  }
+  function parse(r) {                      // CallToolResult → 객체
+    if (!r) return {};
+    const sc = r.structuredContent;
+    if (sc && typeof sc === "object") return sc.result && typeof sc.result === "object" && !sc.job ? sc.result : sc;
+    for (const c of r.content || []) if (c.type === "text") { try { return JSON.parse(c.text); } catch (_) {} }
+    return {};
+  }
+
+  const S = { input: null, doc: null, job: null, page: 1, pages: 0, rev: "", poll: null, pollUntil: 0, mode: "inline" };
+
+  window.addEventListener("message", (e) => {
+    const m = e.data;
+    if (!m || m.jsonrpc !== "2.0") return;
+    if (m.id != null && ("result" in m || "error" in m)) {
+      const p = pending.get(m.id);
+      if (p) { pending.delete(m.id); m.error ? p.rej(new Error(m.error.message || "오류")) : p.res(m.result); }
+      return;
+    }
+    const p = m.params || {};
+    if (m.method === "ui/notifications/tool-input") { S.input = p.arguments || p.input || {}; working(); }
+    else if (m.method === "ui/notifications/tool-result") onResult(p);
+    else if (m.method === "ui/notifications/tool-cancelled") { if (!S.doc) app.innerHTML = '<div class="msg">취소됨</div>'; }
+    else if (m.method === "ui/notifications/host-context-changed") context(p);
+  });
+
+  function context(c) {
+    if (!c) return;
+    if (c.theme) document.documentElement.dataset.theme = c.theme;
+    // 호스트 --color-* 변수는 쓰지 않는다: claude.ai 가 다크 테마에서도 밝은 값을 줘서 흰 테두리·흐린 글자가 됐다 (2026-10-06)
+    if (c.displayMode) { S.mode = c.displayMode; const b = $("fs"); if (b) b.textContent = S.mode === "fullscreen" ? "작게" : "크게"; }
+  }
+
+  // 키가 바뀌면 호스트에 알린다 (inline 창 높이)
+  const resize = () => notify("ui/notifications/size-changed", { height: Math.ceil(document.documentElement.getBoundingClientRect().height) });
+  new ResizeObserver(resize).observe(document.body);
+
+  // ---- 도구가 도는 동안 ----
+  function working() {
+    if (S.doc) return;
+    const d = S.input && (S.input.doc || S.input.name);
+    app.innerHTML = `<div class="bar"><span class="name">${esc(d || "한글 문서")}</span><span class="chip busy">Claude 작업 중</span></div>`;
+  }
+
+  function onResult(r) {
+    const o = parse(r);
+    const i = S.input || {};
+    if (r && r.isError) {
+      if (!S.doc) app.innerHTML = `<div class="msg err">${esc(text(r).slice(0, 300) || "도구 오류")}</div>`;
+      return;
+    }
+    if (o.upload_url) return uploader(o.upload_url, o.expires_at);
+    const d = o.job || i.doc || (i.args && i.args.doc);
+    if (!d) { app.innerHTML = ""; resize(); return; }        // 문서와 상관없는 결과 (hwp_run 의 폴더 검색 등)
+    S.doc = d;
+    S.page = parseInt(String(i.pages || "").split(/[-,]/)[0], 10) || firstChanged(o) || 1;
+    viewer();
+    load();
+  }
+  const firstChanged = (o) => (o.changed_pages && o.changed_pages[0]) || 0;
+
+  // ---- 쪽 보기 ----
+  const DOC_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg>';
+  const UP_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M5 16v3a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3"/></svg>';
+
+  // 누른 자리에서 퍼지는 물결 — "눌렀다" 는 느낌
+  document.addEventListener("pointerdown", (e) => {
+    const b = e.target.closest("button");
+    if (!b || b.disabled) return;
+    const r = b.getBoundingClientRect(), d = Math.max(r.width, r.height);
+    const s = document.createElement("span");
+    s.className = "ripple";
+    Object.assign(s.style, { width: d + "px", height: d + "px", left: e.clientX - r.left - d / 2 + "px", top: e.clientY - r.top - d / 2 + "px" });
+    b.appendChild(s);
+    setTimeout(() => s.remove(), 500);
+  });
+  async function busyBtn(b, fn) { b.classList.add("wait"); try { await fn(); } finally { b.classList.remove("wait"); } }
+
+  function viewer() {
+    app.innerHTML = `
+      <div class="bar">
+        <span class="ic">${DOC_ICON}</span>
+        <span class="name" id="nm">${esc(S.doc)}</span>
+        <span class="chip mute" id="st">여는 중</span>
+        <span class="pager"><button id="pv" title="앞 쪽" aria-label="앞 쪽">‹</button><span id="pn">-</span><button id="nx" title="다음 쪽" aria-label="다음 쪽">›</button></span>
+        <button id="fs">크게</button>
+        <button id="ed" class="primary" title="실시간 편집기 (새 창)">편집기</button>
+      </div>
+      <div class="page loading" id="pg"><div class="msg">쪽을 그리는 중…</div></div>`;
+    $("pv").onclick = () => { if (S.page > 1) { S.page--; load(); } };
+    $("nx").onclick = () => { if (S.page < S.pages) { S.page++; load(); } };
+    $("ed").onclick = (e) => busyBtn(e.currentTarget, openEditor);
+    $("fs").onclick = (e) => busyBtn(e.currentTarget, () => request("ui/request-display-mode", { displayMode: S.mode === "fullscreen" ? "inline" : "fullscreen" })
+      .then((r) => context({ displayMode: r && r.displayMode })).catch(() => {}));
+  }
+
+  let loading = false;
+  async function load() {
+    if (loading) return;
+    loading = true;
+    $("pg").classList.add("loading");
+    try {
+      const r = await call("hwp_app_page", { doc: S.doc, page: S.page });
+      const info = JSON.parse(text(r).split("\n")[0] || "{}");
+      const img = (r.content || []).find((c) => c.type === "image");
+      Object.assign(S, { job: info.job || S.job, page: info.page, pages: info.pages, rev: info.rev || "" });
+      if (info.job) S.doc = info.job;
+      $("pg").innerHTML = img ? `<img alt="${info.page}쪽" src="data:${img.mimeType || "image/png"};base64,${img.data}">` : '<div class="msg">그림이 없다</div>';
+      status(info);
+      watch();
+    } catch (e) {
+      $("pg").innerHTML = `<div class="msg err">${esc(e.message)}</div>`;
+    } finally {
+      loading = false;
+      const pg = $("pg"); if (pg) pg.classList.remove("loading");
+    }
+  }
+
+  function status(info) {
+    $("nm").textContent = info.name || S.doc;
+    $("pn").textContent = `${S.page} / ${S.pages}`;
+    $("pv").disabled = S.page <= 1;
+    $("nx").disabled = S.page >= S.pages;
+    $("ed").disabled = !S.job;
+    const st = $("st");
+    if (info.busy) { st.className = "chip busy"; st.textContent = "Claude 편집 중"; }
+    else if (info.human) { st.className = "chip busy"; st.textContent = "사용자 편집 중"; }
+    else if (info.current) { st.className = "chip"; st.textContent = `${info.current} · 최신`; }
+    else { st.className = "chip mute"; st.textContent = "원본 (읽기)"; }
+  }
+
+  // Claude 가 계속 고치는 동안 바뀌면 다시 그린다 (10분까지, 3초마다)
+  function watch() {
+    if (!S.job) return;
+    S.pollUntil = Date.now() + 10 * 60 * 1000;
+    if (S.poll) return;
+    S.poll = setInterval(async () => {
+      if (Date.now() > S.pollUntil || document.hidden) { if (Date.now() > S.pollUntil) { clearInterval(S.poll); S.poll = null; } return; }
+      try {
+        const s = parse(await call("hwp_app_state", { job: S.job }));
+        if (s.rev && s.rev !== S.rev) {
+          if (s.changed_pages && s.changed_pages.length && !s.busy) S.page = Math.min(s.changed_pages[0], s.pages || 999);
+          S.rev = s.rev;
+          if (s.busy) status(s); else load();
+        } else if (s.busy || s.human) status(s);
+      } catch (_) { /* 잠깐 끊겨도 다음 차례에 */ }
+    }, 3000);
+  }
+
+  async function openEditor() {
+    try {
+      const o = parse(await call("hwp_app_editor", { job: S.job }));
+      if (o.url) await request("ui/open-link", { url: o.url }).catch(() => notify("ui/open-link", { url: o.url }));
+    } catch (e) { alert(e.message); }
+  }
+
+  // ---- 올리기: Claude 가 코드 실행으로 올리면 저절로 미리보기로 바뀐다. 사람이 직접 놓아도 된다 ----
+  const kb = (n) => n >= 1048576 ? (n / 1048576).toFixed(1) + "MB" : Math.max(1, Math.round(n / 1024)) + "KB";
+  function uploader(url, exp) {
+    app.innerHTML = `
+      <label class="drop" id="dz"><input type="file" id="fi" accept=".hwp,.hwpx,.hml">
+        <span class="cloud">${UP_ICON}</span>
+        <span class="t1" id="t1">Claude 가 첨부 파일을 보내는 중…</span>
+        <span class="t2" id="t2">한글 파일을 여기에 끌어다 놓아도 됩니다 · .hwp .hwpx${exp ? ` · ${esc(exp)}까지` : ""}</span>
+        <span class="prog ind" id="pb"><i></i></span>
+        <span class="ptext" id="pt"></span>
+      </label>`;
+    const dz = $("dz"), pb = $("pb"), pt = $("pt");
+    const bar = (got, total) => {
+      if (total > 0) { pb.classList.remove("ind"); pb.firstChild.style.width = Math.min(100, (got / total) * 100) + "%"; pt.textContent = `${kb(got)} / ${kb(total)}`; }
+      else { pb.classList.add("ind"); pt.textContent = got ? kb(got) : ""; }
+    };
+    // 창 어디로 끌어와도 칸이 반응한다
+    let depth = 0;
+    const on = (v) => { dz.classList.toggle("on", v); if (v) $("t1").textContent = "놓으면 바로 올라갑니다"; };
+    document.addEventListener("dragenter", (e) => { e.preventDefault(); depth++; on(true); });
+    document.addEventListener("dragover", (e) => e.preventDefault());
+    document.addEventListener("dragleave", () => { if (--depth <= 0) { depth = 0; on(false); $("t1").textContent = done ? "" : "여기에 끌어다 놓아 주세요"; } });
+    document.addEventListener("drop", (e) => { e.preventDefault(); depth = 0; on(false); const f = e.dataTransfer && e.dataTransfer.files[0]; if (f) send(f); });
+    $("fi").onchange = (e) => { const f = e.target.files[0]; if (f) send(f); };
+    let done = false, mine = false;
+    const until = Date.now() + 30 * 60 * 1000;
+    setTimeout(() => {                               // Claude 의 업로드가 안 오면(거부 등) 사람이 놓는 칸으로
+      if (done || mine) return;
+      dz.classList.add("ask");
+      $("t1").textContent = "여기에 끌어다 놓아 주세요";
+      $("t2").textContent = "또는 눌러서 파일 고르기 · .hwp .hwpx";
+      pb.style.visibility = "hidden";
+    }, 8000);
+    const tick = setInterval(async () => {           // curl 로 올라오는 중인가 / 다 올라왔는가
+      if (done || Date.now() > until) { clearInterval(tick); return; }
+      if (mine) return;
+      try {
+        const o = parse(await call("hwp_app_uploaded", { upload_url: url }));
+        if (o.receiving) { dz.classList.remove("ask"); pb.style.visibility = ""; $("t1").textContent = "받는 중…"; bar(o.receiving.got, o.receiving.total); }
+        if (o.job && !done) { done = true; clearInterval(tick); bar(1, 1); $("t1").textContent = `받았습니다 · ${o.name}`; setTimeout(() => open(o.job), 350); }
+      } catch (_) {}
+    }, 1000);
+    function open(job) { S.doc = job; viewer(); load(); }
+    function send(f) {
+      mine = true;
+      dz.classList.remove("ask"); pb.style.visibility = "";
+      $("t1").textContent = `올리는 중… ${f.name}`; $("t2").textContent = "";
+      bar(0, f.size);
+      const fd = new FormData(); fd.append("file", f, f.name);
+      const x = new XMLHttpRequest();                // fetch 는 올리기 진행률을 못 준다
+      x.open("POST", url);
+      x.upload.onprogress = (e) => bar(e.loaded, e.lengthComputable ? e.total : f.size);
+      x.onerror = () => fail("연결이 끊겼다");
+      x.onload = () => {
+        let o = {};
+        try { o = JSON.parse(x.responseText); } catch (_) {}
+        if (x.status !== 200) return fail(o.error || `HTTP ${x.status}`);
+        done = true; clearInterval(tick); bar(1, 1);
+        $("t1").textContent = `올렸습니다 · ${o.name}`;
+        notify("ui/update-model-context", { content: [{ type: "text", text: `'${o.name}' 을(를) 채팅 안 업로드 칸으로 올렸다 → job ${o.job}. hwp 도구의 doc 에 "${o.job}" 를 쓴다.` }] });
+        request("ui/message", { role: "user", content: [{ type: "text", text: `${o.name} 올렸어 (job ${o.job})` }] }).catch(() => {});
+        setTimeout(() => open(o.job), 350);
+      };
+      x.send(fd);
+    }
+    function fail(m) { mine = false; $("t1").textContent = "올리지 못했습니다"; $("t2").innerHTML = `<span class="err">${esc(m)}</span> · 다시 놓아 주세요`; pb.style.visibility = "hidden"; }
+  }
+
+  // ---- 시작 ----
+  request("ui/initialize", {
+    protocolVersion: "2026-01-26",
+    clientInfo: { name: "hwp-viewer", version: "1.0.0" },
+    appCapabilities: { availableDisplayModes: ["inline", "fullscreen"] },
+  }).then((r) => { context(r && r.hostContext); notify("ui/notifications/initialized"); })
+    .catch(() => notify("ui/notifications/initialized"));
+})();
+</script>
+</body>
+</html>

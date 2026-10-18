@@ -1,0 +1,4 @@
+[
+  {"username": "alice", "label": "Alice", "roots": "all", "write": true},
+  {"username": "bob", "label": "Bob", "roots": ["docs"], "write": false}
+]

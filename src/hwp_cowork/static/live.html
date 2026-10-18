@@ -1,0 +1,371 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>__TITLE__ — hwp-cowork</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>
+:root{--bg:#f6f7f9;--panel:#fff;--line:#e4e6eb;--text:#16181d;--muted:#6b7280;--accent:#2563eb;--accent-soft:#e8efff;
+  --claude:#c2410c;--claude-soft:#fff1e8;--me:#047857;--me-soft:#e7f7ef;--warn:#b45309;--warn-soft:#fff7e6;--del:#b91c1c;--del-soft:#fdecec;--add-soft:#e9f8ee;
+  --shadow:0 1px 2px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.06);--r:10px}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1115;--panel:#171a21;--line:#262b35;--text:#e8eaef;--muted:#9aa3b2;--accent:#6ea0ff;--accent-soft:#1b2a4a;
+  --claude:#fb923c;--claude-soft:#3a2416;--me:#34d399;--me-soft:#133126;--warn:#fbbf24;--warn-soft:#3a2c10;--del:#f87171;--del-soft:#3b1717;--add-soft:#12301f}}
+*{box-sizing:border-box}html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+  font:14px/1.45 system-ui,-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif}
+button{font:inherit;color:inherit;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:.45rem .8rem;cursor:pointer}
+button:hover{border-color:var(--muted)}button:disabled{opacity:.5;cursor:default}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.ghost{border-color:transparent;background:transparent}
+.app{display:flex;flex-direction:column;height:100%}
+header{display:flex;align-items:center;gap:.75rem;padding:.65rem .9rem .5rem;background:var(--panel);border-bottom:1px solid var(--line)}
+.doc{min-width:0;flex:1}.doc b{display:block;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:15px}
+.doc small{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+.pill{display:inline-flex;align-items:center;gap:.4rem;padding:.25rem .65rem;border-radius:999px;font-size:12.5px;background:var(--accent-soft);color:var(--accent);white-space:nowrap}
+.pill.busy{background:var(--claude-soft);color:var(--claude)}.pill.dirty{background:var(--warn-soft);color:var(--warn)}.pill.off{background:var(--line);color:var(--muted)}
+.dot{width:8px;height:8px;border-radius:50%;background:currentColor}.busy .dot{animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.25}}
+header{transition:background .2s;min-height:56px}.brand{font-weight:700;letter-spacing:-.01em;color:var(--fg,inherit);text-decoration:none;white-space:nowrap;padding-right:.25rem}.brand span{color:var(--claude)}header.info{background:var(--accent-soft)}header.warn{background:var(--warn-soft)}header.busy{background:var(--claude-soft)}
+.banner{display:none;align-items:center;gap:.5rem;font-size:13px;min-width:0;white-space:nowrap;height:30px;
+  padding:0 .3rem 0 .75rem;border-radius:999px;background:var(--panel);border:1px solid var(--line)}
+.banner.show{display:inline-flex}#bannerText{overflow:hidden;text-overflow:ellipsis}#bannerActs{display:flex;gap:.2rem}
+#bannerActs button{height:24px;padding:0 .6rem;font-size:12.5px;border-radius:999px;border-color:transparent;background:transparent;color:var(--accent)}
+#bannerActs button:hover{background:var(--accent-soft)}#bannerActs button.primary{background:var(--accent);color:#fff}
+header.info .banner{border-color:var(--accent)}header.warn .banner{border-color:var(--warn)}header.busy .banner{border-color:var(--claude)}
+.banner.show+#status{display:none}
+main{flex:1;display:grid;grid-template-columns:300px 1fr;min-height:0;transition:grid-template-columns .15s}
+main.collapsed{grid-template-columns:0 1fr}main.collapsed aside{overflow:hidden;border-right:none}
+aside .hd{display:flex;align-items:center;justify-content:space-between;padding-right:.4rem}aside .hd button{padding:.15rem .5rem;font-size:13px;color:var(--muted)}
+aside{background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+aside h3{margin:0;padding:.8rem .9rem .5rem;font-size:12px;letter-spacing:.04em;color:var(--muted);font-weight:600}
+#versions{list-style:none;margin:0;padding:0 .5rem .8rem;overflow:auto;flex:1}
+.v{position:relative;padding:.55rem .6rem .55rem 2.3rem;border-radius:var(--r);cursor:pointer;margin-bottom:2px}
+.v:hover{background:var(--bg)}.v.sel{background:var(--accent-soft)}
+.v .badge{position:absolute;left:.55rem;top:.6rem;width:1.35rem;height:1.35rem;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:700;color:#fff;background:var(--muted)}
+.v.claude .badge{background:var(--claude)}.v.me .badge{background:var(--me)}
+.v .t{display:flex;gap:.4rem;align-items:baseline}.v .t b{font-weight:600}.v .t span{color:var(--muted);font-size:12px;margin-left:auto}
+.v .n{color:var(--muted);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tag{font-size:11px;padding:0 .4rem;border-radius:6px;background:var(--line);color:var(--muted)}.tag.latest{background:var(--accent-soft);color:var(--accent);font-weight:600}.tag.nas{background:var(--me-soft);color:var(--me)}
+.v .acts{display:none;gap:.35rem;margin-top:.4rem;flex-wrap:wrap}.v.sel .acts{display:flex}.v .acts button{padding:.2rem .55rem;font-size:12.5px;white-space:nowrap}
+#editorWrap{position:relative;min-height:0}#editor{position:absolute;inset:0}
+#loading{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);background:var(--bg)}
+.flash{animation:flash 1.2s}@keyframes flash{0%{box-shadow:inset 0 0 0 3px var(--claude)}100%{box-shadow:inset 0 0 0 0 transparent}}
+dialog{border:none;border-radius:14px;padding:0;background:var(--panel);color:var(--text);box-shadow:var(--shadow);width:min(720px,94vw);max-height:86vh}
+dialog::backdrop{background:rgba(0,0,0,.35)}
+.dh{display:flex;align-items:center;gap:.5rem;padding:.9rem 1rem;border-bottom:1px solid var(--line)}.dh b{flex:1}
+.db{padding:1rem;overflow:auto;max-height:70vh}.df{display:flex;gap:.5rem;justify-content:flex-end;padding:.8rem 1rem;border-top:1px solid var(--line)}
+.chg{border:1px solid var(--line);border-radius:8px;margin-bottom:.5rem;overflow:hidden}
+.chg .pg{font-size:11.5px;color:var(--muted);padding:.25rem .6rem;border-bottom:1px solid var(--line)}
+.chg .old,.chg .new{padding:.35rem .6rem;white-space:pre-wrap;word-break:break-word}
+.chg .old{background:var(--del-soft)}.chg .new{background:var(--add-soft)}
+del{color:var(--del);text-decoration:line-through;background:transparent}ins{text-decoration:none;font-weight:600;color:var(--me)}
+.frow{display:flex;align-items:center;gap:.6rem;margin-bottom:.6rem}.frow>label{width:3rem;color:var(--muted);flex:none}
+.frow select,.frow input{flex:1;min-width:0;padding:.45rem .6rem;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font:inherit}
+.crumb{flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:.15rem;align-items:center}.crumb button{padding:.2rem .45rem}.crumb span{color:var(--muted)}
+.folders{list-style:none;margin:0 0 .6rem;padding:0;border:1px solid var(--line);border-radius:10px;max-height:40vh;overflow:auto}
+.folders li{padding:.5rem .75rem;border-bottom:1px solid var(--line);cursor:pointer;display:flex;gap:.5rem}.folders li:last-child{border-bottom:none}
+.folders li:hover{background:var(--accent-soft)}.folders li.empty{color:var(--muted);cursor:default}.folders li.empty:hover{background:none}
+.hint{color:var(--muted)}
+.opt{display:flex;gap:.7rem;padding:.75rem;border:1px solid var(--line);border-radius:10px;margin-bottom:.6rem;cursor:pointer}
+.opt:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}.opt small{display:block;color:var(--muted)}
+select{font:inherit;padding:.35rem;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--text)}
+#toast{position:fixed;left:50%;bottom:1.2rem;transform:translateX(-50%);background:#111;color:#fff;padding:.55rem 1rem;border-radius:10px;font-size:13.5px;display:none;z-index:20;max-width:92vw}
+#menuBtn{display:none!important;color:var(--muted);transition:color .15s,background .15s}#menuBtn:hover{color:var(--accent);background:var(--accent-soft)}body.side-off #menuBtn{display:inline-block!important}
+@media (max-width:820px){main{grid-template-columns:1fr}aside{position:fixed;z-index:15;left:0;right:0;bottom:0;max-height:60vh;border-right:none;border-top:1px solid var(--line);
+  border-radius:14px 14px 0 0;box-shadow:var(--shadow);transform:translateY(100%);transition:transform .2s}aside.open{transform:none}
+  #menuBtn{display:inline-block!important}.hide-sm{display:none}header{gap:.5rem}#sideClose{display:none}
+  header.info .doc,header.warn .doc,header.busy .doc{display:none}.banner{flex:1}}
+</style></head><body>
+<div class="app">
+<header>
+  <button id="menuBtn" class="ghost" title="판 기록 열기" aria-label="판 기록" style="padding:.35rem;line-height:0"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg></button>
+  <a class="brand hide-sm" href="https://github.com/pgc3344/hwp-cowork" target="_blank" rel="noopener" title="hwp-cowork — Claude 와 함께 쓰는 한글 동시편집">hwp<span>·</span>cowork</a>
+  <div class="doc"><b id="name">불러오는 중…</b><small id="src"></small></div>
+  <div id="banner" class="banner"><span id="bannerText"></span><span id="bannerActs"></span></div>
+  <span id="status" class="pill off"><span class="dot"></span><span id="statusText">연결 중</span></span>
+  <button id="save" disabled title="고친 내용을 새 판으로 (멈추면 4초 뒤 자동 저장)">저장</button>
+  <button id="dl" class="hide-sm">다운로드</button>
+  <button id="apply" class="primary" disabled>폴더에 저장</button>
+</header>
+<main id="main">
+  <aside id="side"><div class="hd"><h3>판 기록</h3><button id="sideClose" class="ghost" title="판 기록 닫기">« 닫기</button></div><ul id="versions"></ul></aside>
+  <div id="editorWrap"><div id="editor"></div><div id="loading">에디터를 준비하는 중…</div></div>
+</main>
+</div>
+<dialog id="diffDlg"><div class="dh"><b id="diffTitle">바뀐 곳</b><button class="ghost" onclick="diffDlg.close()">닫기</button></div><div class="db" id="diffBody"></div></dialog>
+<dialog id="applyDlg"><div class="dh"><b>폴더에 저장</b><button class="ghost" onclick="applyDlg.close()">닫기</button></div>
+<div class="db">
+  <div class="frow"><label>판</label><select id="applyV"></select></div>
+  <div class="frow"><label>이름</label><input id="applyName" spellcheck="false"></div>
+  <div class="frow"><label>폴더</label><div id="crumb" class="crumb"></div></div>
+  <ul id="folders" class="folders"></ul>
+  <small class="hint">같은 이름이 있으면 덮어쓰지 않고 <code>이름_v2</code> 처럼 번호를 붙여 저장해요. 원본은 바뀌지 않아요.</small>
+</div><div class="df"><button onclick="applyDlg.close()">취소</button><button id="applyGo" class="primary">여기에 저장</button></div></dialog>
+<dialog id="askDlg" style="width:min(460px,94vw)"><div class="dh"><b id="askTitle">확인</b></div>
+<div class="db" id="askBody"></div><div class="df"><button id="askNo">취소</button><button id="askYes" class="primary">확인</button></div></dialog>
+<div id="toast"></div>
+<script type="module">
+import { createStudio } from './static/rhwp-editor/index.js';
+const TOKEN = location.pathname.split('/')[2], BASE = `/live/${TOKEN}`, STUDIO = '__STUDIO__';
+const $ = s => document.querySelector(s);
+const toast = (t, ms = 3000, act) => {
+  const e = $('#toast'); e.textContent = t;
+  if (act) { const b = document.createElement('button'); b.textContent = act[0]; b.style.cssText = 'margin-left:.6rem;padding:.15rem .55rem;background:#fff;color:#111;border:none';
+             b.onclick = () => { e.style.display = 'none'; act[1](); }; e.appendChild(b); }
+  e.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(() => e.style.display = 'none', ms); };
+// 에디터(같은 도메인으로 중계된 studio) 의 스크롤 영역 — 새 판을 불러와도 보던 자리를 지킨다
+const scroller = () => { try { return document.querySelector('#editor iframe')?.contentDocument?.getElementById('scroll-container'); } catch { return null; } };
+async function restoreScroll(pos) {
+  if (!pos) return;
+  for (let i = 0; i < 30; i++) {
+    await new Promise(r => setTimeout(r, 100));
+    const el = scroller();
+    if (el && el.scrollHeight >= pos.t + el.clientHeight * 0.5) { el.scrollTop = pos.t; el.scrollLeft = pos.l; return; }
+  }
+}
+async function goPage(n) {
+  const el = scroller(); if (!el) return;
+  let pc = 1; try { pc = (await studio.getDocumentState()).pageCount || 1; } catch {}
+  el.scrollTop = Math.max(0, (n - 1) / pc * el.scrollHeight - 20);
+}
+const LABEL = { open: '원본', hwp_new: '새로 만듦', hwp_set_cell: '표 칸 수정', hwp_fill_fields: '누름틀 채우기', hwp_replace_text: '문구 바꾸기',
+  editor: '직접 편집', 'editor-auto': '직접 편집', restore: '되돌림' };
+const who = by => by === 'open' ? 'orig' : (by.startsWith('editor') || by === 'restore') ? 'me' : 'claude';
+const label = by => LABEL[by] || by.replace(/^hwp_/, '').replace(/_/g, ' ');
+const hhmm = at => (at || '').slice(11, 16);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+let S = null, studio = null, shown = null, following = true, dirty = false,
+    ownVersion = null, saving = false, autoTimer = null, pending = null, lastSeq = null;
+const ext = () => S.ext;
+const initialV = new URLSearchParams(location.search).get('v');
+
+function setStatus() {
+  const st = $('#status'), tx = $('#statusText');
+  st.className = 'pill';
+  if (!S) { st.classList.add('off'); tx.textContent = '연결 중'; return; }
+  if (S.busy) { st.classList.add('busy'); tx.textContent = 'Claude 가 고치는 중'; }
+  else if (saving) { tx.textContent = '저장 중…'; }
+  else if (dirty) { st.classList.add('dirty'); tx.textContent = following ? '고친 내용 저장 대기' : '저장 안 된 수정'; }
+  else { tx.textContent = following ? `실시간 · ${S.current}` : `${shown} 보는 중`; }
+}
+function banner(kind, html, acts = []) {
+  const b = $('#banner'); document.querySelector('header').className = kind || '';
+  if (!kind) { b.className = 'banner'; return; }
+  b.className = `banner show ${kind}`; $('#bannerText').innerHTML = html;
+  const a = $('#bannerActs'); a.innerHTML = '';
+  for (const [t, fn, primary] of acts) { const x = document.createElement('button'); x.textContent = t; if (primary) x.className = 'primary'; x.onclick = fn; a.appendChild(x); }
+}
+function refreshBanner() {
+  if (pending) return;                                   // 충돌 안내가 우선
+  if (S?.busy) return banner('busy', `<b>Claude 가 고치는 중</b> · ${esc(label(S.busy))} — 끝나면 바로 보여드려요`);
+  if (!following) return banner('info', `<b>${shown}</b> 보는 중 · 최신은 ${S.current}`,
+    [['이 판으로 되돌리기', () => restore(shown)], ['최신으로', () => openVersion(S.current, true), true]]);
+  banner(null);
+}
+function renderVersions() {
+  const ul = $('#versions'); ul.innerHTML = '';
+  const applied = {}; for (const a of S.applied || []) (applied[a.v] ||= []).push(a);
+  for (const v of [...S.versions].reverse()) {
+    const li = document.createElement('li'), w = who(v.by);
+    li.className = `v ${w}` + (v.v === shown ? ' sel' : '');
+    const tags = (v.v === S.current ? '<span class="tag latest">최신</span>' : '') +
+      (applied[v.v] ? `<span class="tag nas" title="${esc(applied[v.v].map(a => a.path).join(', '))}">폴더 저장</span>` : '');
+    li.innerHTML = `<span class="badge">${w === 'claude' ? 'AI' : w === 'me' ? '나' : '원'}</span>
+      <div class="t"><b>${v.v}</b> ${esc(label(v.by))} ${tags}<span>${hhmm(v.at)}</span></div>
+      <div class="n" title="${esc(v.note)}">${v.pages?.length ? `<b>${v.pages.slice(0, 4).join(',')}쪽</b> · ` : ''}${esc(w === 'claude' ? 'Claude · ' : '')}${esc(v.note || '')}</div>
+      <div class="acts"></div>`;
+    const acts = li.querySelector('.acts');
+    const add = (t, fn) => { const b = document.createElement('button'); b.textContent = t; b.onclick = e => { e.stopPropagation(); fn(); }; acts.appendChild(b); };
+    const idx = S.versions.findIndex(x => x.v === v.v);
+    if (idx > 0) add('바뀐 곳', () => showDiff(S.versions[idx - 1].v, v.v));
+    if (v.pages?.length) add(`${v.pages[0]}쪽으로`, () => goPage(v.pages[0]));
+    if (v.v !== S.current) add('최신과 비교', () => showDiff(v.v, S.current));
+    if (v.v !== S.current) add('되돌리기', () => restore(v.v));
+    li.onclick = () => openVersion(v.v, v.v === S.current);
+    ul.appendChild(li);
+  }
+}
+async function fetchBytes(v) { const r = await fetch(`${BASE}/file?v=${v}`); if (!r.ok) throw new Error('판을 받지 못했어요'); return r.arrayBuffer(); }
+async function openVersion(v, follow) {
+  if (dirty && !await ask('저장 안 된 수정', '저장 안 된 수정이 있어요. 버리고 다른 판을 열까요?', '버리고 열기', true)) return;
+  $('#side').classList.remove('open');
+  const buf = await fetchBytes(v);
+  const sc = scroller(), pos = sc ? { t: sc.scrollTop, l: sc.scrollLeft } : null;
+  await studio.loadFile(buf, S.name, { skipUnsavedGuard: true });
+  restoreScroll(pos);
+  // rhwp 순정 저장 연동: 서버에 있는 판을 연 것이므로 미저장 표시·자동복구 초안을 정리한다
+  try { await studio.notifySaved(S.name); } catch {}
+  
+  shown = v; following = !!follow; dirty = false; pending = null;
+  renderVersions(); refreshBanner(); setStatus();
+}
+async function save(auto) {
+  if (!dirty || saving || !following) return;
+  saving = true; setStatus();
+  try {
+    const bytes = await studio.hwpctrl.exportBytes(ext());
+    const r = await fetch(`${BASE}/save?auto=${auto ? 1 : 0}&base=${shown}`, { method: 'POST', body: bytes });
+    const j = await r.json().catch(() => ({}));
+    if (r.status === 409) { conflict(j.current); return; }
+    if (!r.ok) throw new Error(j.error || r.statusText);
+    try { await studio.notifySaved(S.name); } catch {}
+    
+    ownVersion = shown = j.version; dirty = false;
+    if (!auto) toast(`${j.version} 로 저장했어요`);
+  } catch (e) { toast('저장 실패: ' + (e.message || e), 6000); }
+  finally { saving = false; setStatus(); $('#save').disabled = !dirty; }
+}
+function conflict(cur) {
+  pending = cur;
+  banner('warn', `<b>Claude 가 ${cur} 를 만들었어요.</b> 지금 화면에 저장 안 된 내 수정이 있어요.`,
+    [['내 수정 버리고 불러오기', () => { dirty = false; openVersion(cur, true); }],
+     ['내 수정을 새 판으로 저장', () => { pending = null; forceSave(); }, true]]);
+}
+async function forceSave() {
+  saving = true; setStatus();
+  try {
+    const bytes = await studio.hwpctrl.exportBytes(ext());
+    const r = await fetch(`${BASE}/save?auto=0&force=1`, { method: 'POST', body: bytes });
+    const j = await r.json(); if (!r.ok) throw new Error(j.error);
+    try { await studio.notifySaved(S.name); } catch {}
+    
+    ownVersion = shown = j.version; dirty = false; following = true; toast(`${j.version} 로 저장했어요 (Claude 의 이전 판은 기록에 남아 있어요)`, 5000);
+  } catch (e) { toast('저장 실패: ' + (e.message || e), 6000); }
+  finally { saving = false; banner(null); refreshBanner(); setStatus(); }
+}
+async function restore(v) {
+  if (!await ask('이 판으로 되돌리기', `<b>${esc(v)}</b> 의 내용을 새 판으로 올려요. 기록은 지워지지 않아요.`, '되돌리기')) return;
+  const r = await fetch(`${BASE}/restore?v=${v}`, { method: 'POST' }); const j = await r.json();
+  if (!r.ok) return toast(j.error || '실패');
+  ownVersion = j.version; toast(`${v} 로 되돌려 ${j.version} 를 만들었어요`); await openVersion(j.version, true);
+}
+function inline(a, b) {        // 한 문단 안 글자 차이 표시
+  let i = 0; while (i < a.length && a[i] === b[i]) i++;
+  let j = 0; while (j < a.length - i && j < b.length - i && a[a.length - 1 - j] === b[b.length - 1 - j]) j++;
+  return [esc(a.slice(0, i)) + '<del>' + esc(a.slice(i, a.length - j)) + '</del>' + esc(a.slice(a.length - j)),
+          esc(b.slice(0, i)) + '<ins>' + esc(b.slice(i, b.length - j)) + '</ins>' + esc(b.slice(b.length - j))];
+}
+async function showDiff(a, b) {
+  $('#diffTitle').textContent = `${a} → ${b} 바뀐 곳`; $('#diffBody').innerHTML = '<p>비교하는 중…</p>'; diffDlg.showModal();
+  const r = await fetch(`${BASE}/diff?a=${a}&b=${b}`); const d = await r.json();
+  if (!r.ok) { $('#diffBody').textContent = d.error || '비교 실패'; return; }
+  if (!d.count) { $('#diffBody').innerHTML = '<p>본문 글자는 같아요. (서식·표 모양만 바뀌었을 수 있어요)</p>'; return; }
+  $('#diffBody').innerHTML = `<p style="margin-top:0;color:var(--muted)">${d.count}곳${d.truncated ? ' (앞부분만)' : ''} · 쪽 수 ${d.pagesA} → ${d.pagesB}</p>` +
+    d.changes.map(c => {
+      const [o, n] = c.type === 'change' ? inline(c.old, c.new) : [esc(c.old), esc(c.new)];
+      return `<div class="chg"><div class="pg">${c.page}쪽 · ${c.type === 'add' ? '추가' : c.type === 'del' ? '삭제' : '변경'}</div>` +
+        (c.old != null ? `<div class="old">${o}</div>` : '') + (c.new != null ? `<div class="new">${n}</div>` : '') + '</div>';
+    }).join('');
+}
+let saveFolder = '';
+async function loadFolders(path) {
+  const ul = $('#folders'); ul.innerHTML = '<li class="empty">불러오는 중…</li>';
+  try {
+    const r = await fetch(`${BASE}/folders?path=${encodeURIComponent(path)}`); const j = await r.json();
+    if (!r.ok) throw new Error(j.error);
+    if (!path && j.default && saveFolder === '') return loadFolders(j.default);
+    saveFolder = j.path;
+    const parts = saveFolder ? saveFolder.split('/') : [];
+    $('#crumb').innerHTML = `<button class="ghost" data-p="">폴더</button>` + parts.map((x, i) =>
+      `<span>/</span><button class="ghost" data-p="${esc(parts.slice(0, i + 1).join('/'))}">${esc(x)}</button>`).join('');
+    $('#crumb').querySelectorAll('button').forEach(b => b.onclick = () => { saveFolder = b.dataset.p === '' ? null : b.dataset.p; loadFolders(b.dataset.p); });
+    ul.innerHTML = j.folders.length ? j.folders.map(f => `<li data-f="${esc(f)}">📁 ${esc(f)}</li>`).join('')
+      : '<li class="empty">하위 폴더 없음 — 이 폴더에 저장돼요</li>';
+    ul.querySelectorAll('li[data-f]').forEach(li => li.onclick = () => loadFolders(saveFolder ? `${saveFolder}/${li.dataset.f}` : li.dataset.f));
+    $('#applyGo').disabled = !saveFolder;
+  } catch (e) { ul.innerHTML = `<li class="empty">폴더를 못 불러왔어요: ${esc(e.message || e)}</li>`; }
+}
+function openApply() {
+  const sel = $('#applyV'); sel.innerHTML = [...S.versions].reverse().map(v => `<option value="${v.v}" ${v.v === (following ? S.current : shown) ? 'selected' : ''}>${v.v} · ${esc(label(v.by))} ${hhmm(v.at)}</option>`).join('');
+  $('#applyName').value = S.name;
+  saveFolder = ''; $('#applyGo').disabled = true; loadFolders('');
+  applyDlg.showModal();
+}
+function ask(title, html, yes = '확인', danger = false) {
+  return new Promise(res => {
+    const d = $('#askDlg'); $('#askTitle').textContent = title; $('#askBody').innerHTML = html;
+    const y = $('#askYes'); y.textContent = yes; y.style.background = danger ? 'var(--del)' : ''; y.style.borderColor = danger ? 'var(--del)' : '';
+    const done = v => { d.close(); res(v); };
+    y.onclick = () => done(true); $('#askNo').onclick = () => done(false); d.oncancel = () => res(false);
+    d.showModal(); $('#askNo').focus();
+  });
+}
+$('#applyGo').onclick = async () => {
+  const v = $('#applyV').value, name = $('#applyName').value.trim();
+  if (!saveFolder) return toast('저장할 폴더를 고르세요');
+  if (!name || /[\\/]/.test(name)) return toast('이름이 이상해요');
+  if (dirty && !await ask('저장 안 된 수정', '화면에 아직 저장 안 된 수정이 있어요. 그건 빼고 고른 판을 저장할까요?', '그래도 저장')) return;
+  const b = $('#applyGo'); b.disabled = true; b.textContent = '저장 중…';
+  try {
+    const q = new URLSearchParams({ v, folder: saveFolder, name });
+    const r = await fetch(`${BASE}/apply?${q}`, { method: 'POST' }); const j = await r.json();
+    if (!r.ok) throw new Error(j.error);
+    applyDlg.close(); toast(`폴더에 저장했어요: ${j.path}`, 6000);
+  } catch (e) { toast('저장 실패: ' + (e.message || e), 7000); }
+  finally { b.disabled = false; b.textContent = '여기에 저장'; }
+};
+$('#apply').onclick = openApply;
+$('#save').onclick = () => { clearTimeout(autoTimer); save(false); };
+$('#dl').onclick = () => { location.href = `${BASE}/file?v=${following ? S.current : shown}&dl=1`; };
+const wide = () => matchMedia('(min-width:821px)').matches;
+function sideOff(off) {
+  $('#main').classList.toggle('collapsed', off); document.body.classList.toggle('side-off', off);
+  try { localStorage.setItem('hwp-live-side-off', off ? '1' : ''); } catch {}
+}
+$('#menuBtn').onclick = () => wide() ? sideOff(false) : $('#side').classList.toggle('open');
+$('#sideClose').onclick = () => sideOff(true);
+try { if (wide() && localStorage.getItem('hwp-live-side-off')) sideOff(true); } catch {}
+
+function onState(s) {
+  const prev = S; S = s;
+  $('#name').textContent = s.name; $('#src').textContent = s.source || '샌드박스'; document.title = `${s.name} — hwp-cowork`;
+  $('#apply').disabled = !s.can_apply;
+  if (studio && prev && s.current !== prev.current && s.current !== ownVersion) {
+    if (following && !dirty) {
+      openVersion(s.current, true).then(() => {
+        $('#editorWrap').classList.remove('flash'); void $('#editorWrap').offsetWidth; $('#editorWrap').classList.add('flash');
+        const v = s.versions[s.versions.length - 1];
+        const pg = (v.pages || []);
+        toast(`${v.v} · ${who(v.by) === 'claude' ? 'Claude' : '나'} · ${label(v.by)}` + (pg.length ? ` · ${pg.slice(0, 5).join(', ')}쪽` : ''),
+              pg.length ? 7000 : 3000, pg.length ? [`${pg[0]}쪽 보기`, () => goPage(pg[0])] : null);
+      });
+    } else if (following && dirty) conflict(s.current);
+  }
+  renderVersions(); refreshBanner(); setStatus();
+}
+function listen() {
+  const es = new EventSource(`${BASE}/events`);
+  es.addEventListener('state', e => onState(JSON.parse(e.data)));
+  es.addEventListener('gone', () => { banner('warn', '이 작업이 만료됐어요 (30일). Claude 에게 다시 부탁하면 새로 만들어요.'); es.close(); });
+  es.onerror = () => { $('#status').className = 'pill off'; $('#statusText').textContent = '다시 연결 중'; };
+  es.onopen = () => setStatus();
+}
+(async () => {
+  try {
+    const r = await fetch(`${BASE}/state`); if (!r.ok) throw new Error('링크가 만료됐어요');
+    S = await r.json();
+    onState(S);
+    // rhwp 순정 자동복구와의 연동: 이 화면에서는 서버가 4초마다 판으로 저장하므로 studio 의 브라우저 초안·복구 창은 끈다
+    // (같은 도메인으로 중계된 studio 일 때만 닿는다). 탭을 닫을 때 저장 안 된 수정이 있으면 경고는 그대로 뜬다
+    if (new URL(STUDIO, location.href).origin === location.origin) {
+      try { const k = 'rhwp-settings', cur = JSON.parse(localStorage.getItem(k) || '{}');
+            cur.autosave = { ...(cur.autosave || {}), recoveryEnabled: false, idleSaveEnabled: false };
+            localStorage.setItem(k, JSON.stringify(cur)); } catch {}
+      try { indexedDB.deleteDatabase('rhwpStudioAutosave'); } catch {}
+    }
+    studio = await createStudio('#editor', { studioUrl: STUDIO, plugins: ['hwpctrl'] });
+    $('#loading').remove();
+    await openVersion(initialV && S.versions.some(v => v.v === initialV) ? initialV : S.current, !initialV || initialV === S.current);
+    listen();
+    // 사람 편집 감지: studio 가 직접 알려주는 dirty·changeSeq (notifySaved 로 풀린다).
+    // 편집이 이어지는 동안은 기다렸다가 4초 멈추면 자동 저장 — 연속 편집은 한 판으로 묶인다
+    setInterval(async () => {
+      if (!studio || saving) return;
+      let st; try { st = await studio.getDocumentState(); } catch { return; }
+      if (st.dirty !== dirty) { dirty = st.dirty; setStatus(); $('#save').disabled = !dirty; }
+      if (dirty && following && !pending && st.changeSeq !== lastSeq) { clearTimeout(autoTimer); autoTimer = setTimeout(() => save(true), 4000); }
+      lastSeq = st.changeSeq;
+    }, 1000);
+    // 서버에 "사람이 고치는 중" 을 알린다 — Claude 편집이 저장 안 된 사람 수정을 덮지 않게
+    setInterval(() => { fetch(`${BASE}/presence?dirty=${dirty ? 1 : 0}&v=${shown}`, { method: 'POST' }).catch(() => {}); }, 2500);
+  } catch (e) { $('#loading').textContent = String(e.message || e); banner('warn', esc(e.message || e)); }
+})();
+addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); clearTimeout(autoTimer); save(false); } });
+addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+</script></body></html>

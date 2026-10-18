@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+tokens.json
+*.sqlite3
+*.sqlite3-*
+.DS_Store
+work/
+data/
+principals.json
+sample-docs/
+shared-docs/

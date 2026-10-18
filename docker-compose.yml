@@ -1,0 +1,37 @@
+# hwp-cowork — 한글(HWP) 문서를 Claude 와 같이 고치는 서버
+#
+#   mkdir -p docs && cp 내문서.hwp docs/
+#   docker compose up -d --build
+#   → MCP 주소 http://localhost:8119/mcp
+#
+# 설정은 .env 로 (cp .env.example .env). 없으면 기본값: 인증 없음, 127.0.0.1 에서만 열림.
+services:
+  hwp-cowork:
+    build: .
+    image: hwp-cowork:latest
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      HWPCOWORK_ROOTS: docs=/docs
+      TMPDIR: /work/.tmp
+      XDG_CACHE_HOME: /work/.cache      # fontconfig 캐시 (read_only 라 집 폴더에 못 쓴다)
+    volumes:
+      - ./docs:/docs:ro                 # 원본 문서 폴더. 사본 저장을 켜려면 README "원본 폴더에 사본 저장"
+      - work:/work                      # 작업 사본·판 (손대지 않은 것은 KEEP_DAYS 뒤 지운다)
+      - data:/data                      # 링크 DB·로그인 서명 키
+    ports:
+      - "${HWPCOWORK_BIND:-127.0.0.1}:8119:8119"
+    mem_limit: 8g                       # 수백 쪽 문서 전체 PDF 변환은 수 GB 를 쓴다
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m
+      - /home/cowork:size=64m
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 256
+
+volumes:
+  work: {}
+  data: {}
