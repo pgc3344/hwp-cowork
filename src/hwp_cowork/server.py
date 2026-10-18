@@ -550,10 +550,10 @@ def build(cfg: Config, registry: Registry | None = None) -> tuple[MCPServer, San
             raise ToolError(f"이름이 이상하다: {base!r}")
         if not any(base.lower().endswith(x) for x in DOC_EXT):
             base += p.suffix
-        try:
-            target_root = target.strip("/").split("/", 1)[0]
-        except Exception:      # noqa: BLE001
-            target_root = ""
+        target_root = target.strip("/").split("/", 1)[0]
+        # 저장할 폴더의 루트를 그 사람이 볼 수 있어야 한다 — 읽을 수 없는 루트에 쓰는 길을 막는다
+        if not _owner(username).can_see(target_root):
+            raise ToolError(f"루트 {target_root!r} 에는 저장할 수 없다 (볼 수 있는 루트가 아니다).")
         if target_root in cfg.writable_roots:
             try:
                 body = _local_put(username, target, base, p.read_bytes())
@@ -1234,8 +1234,9 @@ def serve(cfg: Config, registry: Registry | None, oidc) -> None:
                                          allowed_hosts=cfg.allowed_hosts, allowed_origins=cfg.allowed_origins)
     app = mcp.streamable_http_app(transport_security=security, host=cfg.host)
     asgi = app if registry is None else AuthMiddleware(app, registry, oidc, realm="hwp-cowork", open_paths=OPEN_PATHS)
-    uvicorn.run(asgi, host=cfg.host, port=cfg.port,
-                log_level="info", proxy_headers=True, forwarded_allow_ips="*")
+    # X-Forwarded-* 는 믿을 수 있는 프록시에서 온 것만 받는다 (기본: 같은 기계). 아니면 누구나 출처 IP 를 꾸밀 수 있다
+    uvicorn.run(asgi, host=cfg.host, port=cfg.port, log_level="info", proxy_headers=True,
+                forwarded_allow_ips=os.environ.get("HWPCOWORK_FORWARDED_ALLOW_IPS") or "127.0.0.1")
 
 
 if __name__ == "__main__":

@@ -18,6 +18,7 @@ import hmac
 import html
 import json
 import logging
+import os
 import secrets
 import threading
 import time
@@ -225,8 +226,11 @@ class Throttle:
 
     @staticmethod
     def ip(request: Request) -> str:
-        return (request.headers.get("cf-connecting-ip")
-                or (request.client.host if request.client else "") or "?")
+        """요청 IP. cf-connecting-ip 는 Cloudflare 뒤라고 밝힌 경우(HWPCOWORK_TRUST_CF=1)에만 믿는다 —
+        아니면 아무나 헤더를 바꿔 가며 대입 차단을 피할 수 있다."""
+        if os.environ.get("HWPCOWORK_TRUST_CF") == "1" and request.headers.get("cf-connecting-ip"):
+            return request.headers["cf-connecting-ip"]
+        return (request.client.host if request.client else "") or "?"
 
     def blocked(self, request: Request) -> bool:
         ip, now = self.ip(request), time.time()
@@ -238,8 +242,8 @@ class Throttle:
     def fail(self, request: Request) -> None:
         ip, now = self.ip(request), time.time()
         with self._lock:
-            if len(self._fails) > 4096:
-                self._fails.clear()
+            if len(self._fails) > 4096:      # 오래된 IP 만 버린다 (통째로 비우면 차단이 풀린다)
+                self._fails = {k: v for k, v in self._fails.items() if v and now - v[-1] < self.window}
             self._fails.setdefault(ip, []).append(now)
             if len(self._fails[ip]) >= self.limit:
                 log.warning("링크 코드 대입 의심 — %s 를 %d분 막는다", ip, int(self.window // 60))

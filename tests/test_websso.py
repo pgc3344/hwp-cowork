@@ -13,12 +13,12 @@ class P:
         self.label = label
 
 
-def _req(cookies: dict | None = None, ip="1.2.3.4", path="/live/abcdEFGH"):
-    hdr = [(b"cf-connecting-ip", ip.encode())]
+def _req(cookies: dict | None = None, ip="1.2.3.4", path="/live/abcdEFGH", cf: str | None = None):
+    hdr = [(b"cf-connecting-ip", cf.encode())] if cf else []
     if cookies:
         hdr.append((b"cookie", "; ".join(f"{k}={v}" for k, v in cookies.items()).encode()))
     return Request({"type": "http", "method": "GET", "path": path, "headers": hdr, "query_string": b"",
-                    "client": ("127.0.0.1", 1), "server": ("x", 443), "scheme": "https"})
+                    "client": (ip, 1), "server": ("x", 443), "scheme": "https"})
 
 
 def _sso(tmp_path):
@@ -51,3 +51,14 @@ def test_throttle():
         assert not t.blocked(_req())
         t.fail(_req())
     assert t.blocked(_req()) and not t.blocked(_req(ip="5.6.7.8"))
+
+
+def test_throttle_ignores_spoofed_cf_header(monkeypatch):
+    """Cloudflare 뒤라고 밝히지 않으면 cf-connecting-ip 를 바꿔 가며 차단을 피할 수 없다."""
+    monkeypatch.delenv("HWPCOWORK_TRUST_CF", raising=False)
+    t = Throttle(limit=3, window=60)
+    for i in range(3):
+        t.fail(_req(cf=f"9.9.9.{i}"))
+    assert t.blocked(_req(cf="9.9.9.99"))
+    monkeypatch.setenv("HWPCOWORK_TRUST_CF", "1")
+    assert not t.blocked(_req(cf="9.9.9.99"))
