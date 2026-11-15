@@ -13,6 +13,11 @@ def _rhwp_version() -> str:
     return m.group(1)
 
 
+def test_notice_links_same_rhwp_tag():
+    notice = (ROOT / "NOTICE.md").read_text()
+    assert f"rhwp/blob/v{_rhwp_version()}/THIRD_PARTY_LICENSES.md" in notice, "NOTICE.md 의 THIRD_PARTY_LICENSES 링크를 RHWP_VERSION 태그로"
+
+
 def test_editor_sdk_matches_rhwp_version():
     sdk = (ROOT / "src/hwp_cowork/static/rhwp-editor/VERSION").read_text()
     assert sdk.startswith(f"@rhwp/editor {_rhwp_version()} "), \
