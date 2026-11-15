@@ -1,13 +1,14 @@
 # rhwp 버전의 유일한 기준 — CLI(조사·편집)·studio(웹 에디터)·editor SDK 가 모두 이 값으로 만들어진다.
 # 상류와 차이가 벌어지면 서버가 경고한다 (rhwp_update.py).
-ARG RHWP_VERSION=v0.8.7
+ARG RHWP_VERSION=v0.9.0
 
 # ---- studio: rhwp-studio 를 이 서버 도메인(/studio/)에서 내려고 소스에서 빌드한다 (Rust 없이, wasm 은 npm @rhwp/core)
 FROM node:22-bookworm AS studio
 ARG RHWP_VERSION
 WORKDIR /w
+# v0.9.0 부터 studio 가 저장소 안의 vendor/npm/ajv(file: 의존)·rhwp-shared·src/renderer(셰이더) 를 import 한다
 RUN git clone --depth 1 --branch "${RHWP_VERSION}" --filter=blob:none --sparse https://github.com/edwardkim/rhwp.git rhwp \
- && git -C rhwp sparse-checkout set rhwp-studio assets npm/hwpctrl-ocx \
+ && git -C rhwp sparse-checkout set rhwp-studio assets npm/hwpctrl-ocx vendor/npm/ajv rhwp-shared src/renderer \
  && git -C rhwp rev-parse HEAD > /w/commit
 RUN mkdir -p rhwp/pkg && npm pack "@rhwp/core@${RHWP_VERSION#v}" --silent \
  && tar xzf rhwp-core-*.tgz -C rhwp/pkg --strip-components=1 \

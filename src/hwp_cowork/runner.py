@@ -131,6 +131,15 @@ def _ensure_dirs() -> None:
 FILE_IN = {"csv", "image", "capsule", "keyring", "dir", "log", "checkpoint", "policy", "gateEnvelope", "workorder",
            "claim", "sig", "signKey", "domain", "head", "bundle", "trustDomain", "opening", "redacted", "among",
            "contaminated", "anchorLog", "ledger"}
+# 이름이 흔해서 FILE_IN 에 통째로 넣을 수 없는 경로 인자 — 기능별로 (hwp_fill_fields.data 는 객체, hwp_set_chart_data.data 는
+# JSON 문자열이라 경로가 아니다). 2026-11-15: batch_fill.data 가 설명의 '이름' 때문에 _check 를 통과해 바꿔 넣지 않은 채
+# rhwp 로 갔다 — 절대경로로 샌드박스 밖을 읽을 수 있었다
+TOOL_FILE_IN = {"hwp_batch_fill": {"data"}, "hwp_import_pdf": {"resourceLimits"}}
+# 이 서버에서 아직 쓰지 않는 기능 (rhwp v0.9.0 신규) — 결과 자리(새 작업·쪽 그림 폴더)를 서버가 정하기 전까지 분명한 이유로 막는다
+SERVER_BLOCKED = {
+    "hwp_import_pdf": "PDF 가져오기는 이 서버에 아직 연결하지 않았다 — PDF 는 nas 커넥터로 읽는다",
+    "hwp_export_png": "쪽 그림은 hwp_preview 로 본다",
+}
 CREATE_TOOLS = {"hwp_scaffold", "hwp_build_from_ingest"}     # path 가 문서가 아니라 명세 JSON 이다 → hwp_new
 _PATHY = re.compile(r"경로|폴더|파일|path|dir", re.I)
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -188,13 +197,17 @@ class Manifest:
             log.warning("막은 기능 %d개: %s", len(blocked), blocked)
 
     def _check(self, t: Tool) -> str | None:
+        if t.name in SERVER_BLOCKED:
+            return SERVER_BLOCKED[t.name]
         for k, v in t.props.items():
-            if k in DOC_IN | OUT | FILE_IN | {"paths", "plan", "password"}:
+            if k in DOC_IN | OUT | FILE_IN | TOOL_FILE_IN.get(t.name, set()) | {"paths", "plan", "password"}:
                 continue
             if v.get("enum"):
                 continue
-            if v.get("type") == "string" and _PATHY.search(k + " " + (v.get("description") or "")) \
-                    and not re.search(r"문자열|이름|형식|JSON|기대", v.get("description") or ""):
+            d = v.get("description") or ""
+            # '경로' 라고 적힌 인자는 다른 낱말(이름·JSON …)이 같이 있어도 경로다 — 모르는 것은 막는다(fail-closed)
+            if v.get("type") == "string" and ("경로" in d or (_PATHY.search(k + " " + d)
+                                                             and not re.search(r"문자열|이름|형식|JSON|기대", d))):
                 return f"분류되지 않은 경로 인자 {k!r} — 샌드박스를 보장할 수 없어 막았다"
         if "plan" in t.props and t.props["plan"].get("type") != "object":
             return "plan 형식을 알 수 없다"
@@ -510,7 +523,7 @@ class Runner:
         for k, v in args.items():
             if k == "password":
                 continue
-            if k in DOC_IN or k in FILE_IN:
+            if k in DOC_IN or k in FILE_IN or k in TOOL_FILE_IN.get(name, ()):
                 real[k] = self._input(who, job, v, k)
             elif k in OUT:
                 real[k] = self._output(job, v, k)
@@ -532,11 +545,7 @@ class Runner:
         dry = bool(real.get("dryRun"))
 
         base_args = [_fill(a, real) for a in t.cli["args"]]
-        opts: list[str] = []
-        for opt in t.cli.get("optionalArgs", []):
-            w = opt.get("when")
-            if w in real and real[w] not in (False, None):
-                opts += [_fill(a, real) for a in opt["args"]]
+        opts = optional_args(t.cli, real)
         # `--` 뒤는 위치 인자다 (예: search <파일> --json -- <검색어>) — 선택 인자는 반드시 그 앞에
         if "--" in base_args:
             i = base_args.index("--")
@@ -649,6 +658,18 @@ def _short(v: Any) -> str:
 def _listing(job: Job) -> set[str]:
     out = {p.name for p in job.dir.iterdir() if p.is_file() and p.name != "job.json" and not p.name.startswith(".")}
     return out | {f"out/{p.name}" for p in job.out.iterdir()}
+
+
+def optional_args(cli: dict, real: dict[str, Any]) -> list[str]:
+    """manifest 의 optionalArgs 중 값이 있는 것만 CLI 인자로. 0 은 값이다 — 예전 `not in (False, None)` 은 0 == False 라
+    --table 0 · --row 0 · --para 0 을 빠뜨려 첫 표·첫 행·첫 칸 편집이 exit 2 사용법 오류가 났다 (아버지 보고 2026-10-17·10-28·11-05).
+    False 는 켜지 않은 스위치(--dry-run 등)라 뺀다."""
+    opts: list[str] = []
+    for opt in cli.get("optionalArgs", []):
+        w = opt.get("when")
+        if w in real and real[w] is not None and real[w] is not False:
+            opts += [_fill(a, real) for a in opt["args"]]
+    return opts
 
 
 def _fill(arg: str, vals: dict[str, Any]) -> str:
